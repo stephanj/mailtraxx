@@ -59,17 +59,25 @@ describe('MessageViewer', () => {
     expect(text).toContain('speaker@example.com');
   });
 
-  it('defaults to the HTML tab and can switch to Text, Raw, and Headers', async () => {
+  it('defaults to the HTML tab and can switch to Text, Raw, and Headers by clicking the tab buttons', async () => {
     await load();
     expect(fixture.componentInstance.tab()).toBe('html');
     expect(fixture.nativeElement.querySelector('mtx-html-preview')).toBeTruthy();
 
-    fixture.componentInstance.tab.set('raw');
+    const buttons = () =>
+      Array.from(fixture.nativeElement.querySelectorAll('.tabs button')) as HTMLButtonElement[];
+
+    // Clicking the real button (rather than setting the `tab` signal directly) is what
+    // actually exercises the (click) binding — a broken click handler would still pass
+    // if the assertions only ever drove the signal programmatically.
+    buttons()[2].click(); // Raw
     fixture.detectChanges();
+    expect(fixture.componentInstance.tab()).toBe('raw');
     expect(fixture.nativeElement.textContent).toContain('Subject: Your talk was accepted');
 
-    fixture.componentInstance.tab.set('headers');
+    buttons()[3].click(); // Headers
     fixture.detectChanges();
+    expect(fixture.componentInstance.tab()).toBe('headers');
     expect(fixture.nativeElement.textContent).toContain('x-custom');
   });
 
@@ -96,5 +104,20 @@ describe('MessageViewer', () => {
     http.expectOne({ url: '/api/messages/1', method: 'DELETE' }).flush(null);
     await fixture.whenStable();
     expect(emitted).toBe(1);
+  });
+
+  it('does not delete when the user cancels the confirmation', async () => {
+    await load();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    let emitted: number | undefined;
+    fixture.componentInstance.deleted.subscribe((id) => (emitted = id));
+
+    await fixture.componentInstance.remove();
+
+    // http.verify() in afterEach would also fail on a stray unflushed request, but
+    // asserting expectNone explicitly proves the cancel path never issues the DELETE —
+    // this is an irreversible action and deserves a direct test, not just inspection.
+    http.expectNone({ url: '/api/messages/1', method: 'DELETE' });
+    expect(emitted).toBeUndefined();
   });
 });

