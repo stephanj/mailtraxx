@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   effect,
   inject,
   input,
@@ -11,6 +12,11 @@ import { httpResource } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { LiveFeed } from './live-feed';
 import type { MessageSummary } from './models';
+
+// The server clamps ?limit= to 200 (see api.ts's parseLimit). Requesting the
+// cap up front means the newest 200 messages are always reachable without
+// search, instead of silently stopping at the server's *default* of 50.
+const MESSAGE_LIMIT = 200;
 
 @Component({
   selector: 'mtx-message-list',
@@ -51,6 +57,11 @@ import type { MessageSummary } from './models';
             </li>
           }
         </ul>
+        @if (atCap()) {
+          <p class="cap-notice">
+            Showing the newest {{ MESSAGE_LIMIT }} messages. Narrow with search to find older ones.
+          </p>
+        }
       }
     } @else if (messages.error()) {
       <p class="empty">Could not load messages.</p>
@@ -122,6 +133,13 @@ import type { MessageSummary } from './models';
       padding: 1.5rem 0.85rem;
       color: var(--muted);
     }
+    .cap-notice {
+      padding: 0.6rem 0.85rem;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.85em;
+      border-top: 1px solid var(--line);
+    }
   `,
 })
 export class MessageList {
@@ -131,10 +149,15 @@ export class MessageList {
 
   readonly search = signal('');
   readonly #feed = inject(LiveFeed);
+  readonly MESSAGE_LIMIT = MESSAGE_LIMIT;
 
   readonly messages = httpResource<MessageSummary[]>(
-    () => `/api/inboxes/${this.inboxId()}/messages?q=${encodeURIComponent(this.search())}`,
+    () => `/api/inboxes/${this.inboxId()}/messages?q=${encodeURIComponent(this.search())}&limit=${MESSAGE_LIMIT}`,
   );
+
+  // Only meaningful once the request has resolved with a full page — an
+  // in-flight or errored resource must not claim to be "at the cap".
+  readonly atCap = computed(() => this.messages.hasValue() && this.messages.value().length >= MESSAGE_LIMIT);
 
   constructor() {
     // Any server-side change to this inbox refetches the list.
