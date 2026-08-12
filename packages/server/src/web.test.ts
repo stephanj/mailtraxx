@@ -81,6 +81,33 @@ test('refuses to serve files outside the UI root', async () => {
   await h.close();
 });
 
+test(
+  "close() doesn't hang behind an open /api/events SSE connection",
+  { timeout: 5000 },
+  async () => {
+    const h = await harness();
+    // A real UI holds this connection open indefinitely; server.close() alone
+    // waits for every open connection to end on its own, so a naive
+    // implementation would hang here forever once the SPA is generating
+    // traffic like this.
+    const controller = new AbortController();
+    const res = await fetch(`${h.base}/api/events`, { signal: controller.signal });
+    assert.equal(res.status, 200);
+    res.body?.getReader().read().catch(() => {});
+
+    const closed = h.close();
+    const timedOut = await Promise.race([
+      closed.then(() => false),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 2000)),
+    ]);
+    // Release the client socket either way so a regression can't hang the
+    // rest of the suite while this assertion fails loudly instead.
+    controller.abort();
+    assert.equal(timedOut, false, 'close() should not wait for the SSE client to disconnect first');
+    await closed;
+  },
+);
+
 test('reports a busy port instead of crashing anonymously', async () => {
   const store = new SqliteStore(':memory:', 500);
   const bus = new EventBus();

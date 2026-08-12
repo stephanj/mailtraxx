@@ -29,7 +29,19 @@ export async function runMailtraxx(
     logCaptured(result.message.subject, result.message.fromDisplay, result.message.toAddrs, result.inbox.name);
   });
 
-  const web = await startWebServer(config, store, bus, UI_ROOT);
+  let web: WebHandle;
+  try {
+    web = await startWebServer(config, store, bus, UI_ROOT);
+  } catch (err) {
+    // The SMTP listener is already bound and the store already open at this
+    // point. If the HTTP side fails to start (e.g. its port is taken), both
+    // must be torn down before rethrowing — otherwise a caller that doesn't
+    // immediately process.exit() (a test, a retry-on-another-port loop) is
+    // left holding a leaked listener and an open database handle.
+    await smtp.close();
+    store.close();
+    throw err;
+  }
 
   console.log(`mailtraxx  SMTP 127.0.0.1:${smtp.port}   UI http://localhost:${web.port}`);
   console.log(`           db ${config.dbPath}   keeping ${config.retain} messages per inbox`);

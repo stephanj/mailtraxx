@@ -104,6 +104,14 @@ export async function startWebServer(
 
   return {
     port: (server.address() as AddressInfo).port,
-    close: () => new Promise<void>((r) => server.close(() => r())),
+    close: () =>
+      new Promise<void>((r) => {
+        // server.close() alone waits for every open connection to end on its
+        // own — which a long-lived /api/events SSE stream never does. Force
+        // in-flight connections closed so shutdown resolves promptly instead
+        // of hanging behind a client that's still listening.
+        server.close(() => r());
+        server.closeAllConnections();
+      }),
   };
 }
