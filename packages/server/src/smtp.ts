@@ -51,17 +51,29 @@ export async function startSmtpServer(
             receivedAt: new Date().toISOString(),
           });
 
+          let result: SaveResult;
           try {
-            const result = store.saveMessage(parsed);
-            onSaved?.(result);
-            callback(null, 'Message captured by mailtraxx');
+            result = store.saveMessage(parsed);
           } catch (cause) {
             const err = new Error(`Could not store message: ${(cause as Error).message}`) as Error & {
               responseCode?: number;
             };
             err.responseCode = 451;
-            callback(err);
+            return callback(err);
           }
+
+          // The message is already durably stored at this point, so a
+          // problem in the (optional, caller-supplied) onSaved callback must
+          // not turn into a 451 — that would tell the sender to retry a
+          // message that already made it in, producing a duplicate. Swallow
+          // (rather than propagate) so it can't stop the 250 below or escape
+          // as an unhandled rejection from this detached async callback.
+          try {
+            onSaved?.(result);
+          } catch (cause) {
+            console.error('mailtraxx: onSaved callback threw', cause);
+          }
+          callback(null, 'Message captured by mailtraxx');
         })();
       });
     },

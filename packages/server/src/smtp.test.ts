@@ -114,3 +114,22 @@ test('a store failure is reported to the sender as 451, never silently dropped',
   await smtp.close();
   store.close();
 });
+
+test('an onSaved callback that throws does not turn a successful save into a 451', async () => {
+  const config = parseConfig(['--smtp-port', '0']);
+  const store = new SqliteStore(':memory:', config.retain);
+  const smtp = await startSmtpServer(config, store, () => {
+    throw new Error('subscriber blew up');
+  });
+  const transport = nodemailer.createTransport({ host: '127.0.0.1', port: smtp.port, secure: false });
+
+  await transport.sendMail({ from: 'a@b.c', to: 'd@e.f', subject: 'Saved anyway', text: 'Saved anyway' });
+
+  const inbox = store.listInboxes()[0];
+  const message = store.listMessages(inbox.id, { limit: 50, offset: 0 })[0];
+  assert.equal(message.subject, 'Saved anyway');
+
+  transport.close();
+  await smtp.close();
+  store.close();
+});
