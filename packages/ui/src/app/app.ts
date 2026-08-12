@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { InboxList } from './inbox-list';
 import { MessageList } from './message-list';
+import { MessageViewer } from './message-viewer';
 import type { Inbox, MessageSummary } from './models';
 
 @Component({
   selector: 'app-root',
-  imports: [InboxList, MessageList],
+  imports: [InboxList, MessageList, MessageViewer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="shell">
@@ -21,7 +22,11 @@ import type { Inbox, MessageSummary } from './models';
         <div class="placeholder">Select an inbox</div>
       }
 
-      <div class="placeholder">Select a message</div>
+      @if (message(); as selected) {
+        <mtx-message-viewer [messageId]="selected.id" (deleted)="message.set(null)" />
+      } @else {
+        <div class="placeholder">Select a message</div>
+      }
     </div>
   `,
   styles: `
