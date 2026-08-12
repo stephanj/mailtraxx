@@ -14,6 +14,26 @@ export interface WebHandle {
   close(): Promise<void>;
 }
 
+const ALLOWED_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+/**
+ * True only when the `Host` header's hostname is one this server is meant to
+ * answer for. Binding to 127.0.0.1 stops a remote network peer, but not a
+ * remote web page: an attacker page on evil.com with a short DNS TTL can
+ * rebind that hostname to 127.0.0.1, at which point `fetch('http://evil.com:1080/...')`
+ * is same-origin from the browser and can read every captured message. Any
+ * port is fine here — only the hostname is checked — and a missing or
+ * unparseable Host header fails closed (rejected).
+ */
+export function isAllowedHost(hostHeader: string | undefined): boolean {
+  if (!hostHeader) return false;
+  try {
+    return ALLOWED_HOSTNAMES.has(new URL(`http://${hostHeader}`).hostname);
+  } catch {
+    return false;
+  }
+}
+
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -50,6 +70,16 @@ export async function startWebServer(
   const root = resolve(uiRoot);
 
   const server = createServer((req, res) => {
+    // UI is not meant to be embeddable; blocks framing the Delete/Clear
+    // controls for clickjacking. writeHead() below merges with headers set
+    // here rather than replacing them, so this survives every response path.
+    res.setHeader('X-Frame-Options', 'DENY');
+
+    if (!isAllowedHost(req.headers.host)) {
+      res.writeHead(403, { 'content-type': 'text/plain' }).end('Forbidden');
+      return;
+    }
+
     if (handleApi(req, res, store, bus)) return;
 
     void (async () => {
