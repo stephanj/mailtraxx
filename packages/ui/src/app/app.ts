@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { InboxList } from './inbox-list';
+import { LiveFeed } from './live-feed';
 import { MessageList } from './message-list';
 import { MessageViewer } from './message-viewer';
 import type { Inbox, MessageSummary } from './models';
@@ -45,6 +46,26 @@ import type { Inbox, MessageSummary } from './models';
 export class App {
   readonly inbox = signal<Inbox | null>(null);
   readonly message = signal<MessageSummary | null>(null);
+
+  readonly #feed = inject(LiveFeed);
+
+  constructor() {
+    // Nothing else invalidates the selected message: MessageList reloads its
+    // list on message.deleted/messages.cleared, but the viewer pane doesn't
+    // hear about it, so clearing an inbox — or deleting the open message from
+    // another tab — would otherwise leave this pane rendering a message that
+    // no longer exists.
+    effect(() => {
+      const event = this.#feed.lastEvent();
+      const selected = this.message();
+      if (!event || !selected) return;
+      if (event.type === 'message.deleted' && event.id === selected.id) {
+        this.message.set(null);
+      } else if (event.type === 'messages.cleared' && event.inboxId === selected.inboxId) {
+        this.message.set(null);
+      }
+    });
+  }
 
   selectInbox(inbox: Inbox): void {
     this.inbox.set(inbox);
