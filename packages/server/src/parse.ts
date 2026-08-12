@@ -20,9 +20,7 @@ function ccAddresses(parsed: Awaited<ReturnType<typeof simpleParser>>): string[]
   const cc = parsed.cc;
   if (!cc) return [];
   const list = Array.isArray(cc) ? cc : [cc];
-  return list
-    .flatMap((entry) => entry.value.map((v: { address?: string }) => v.address ?? ''))
-    .filter(Boolean);
+  return list.flatMap((entry) => entry.value.map((v) => v.address ?? '')).filter(Boolean);
 }
 
 /**
@@ -75,7 +73,7 @@ export async function parseMessage(raw: Buffer, envelope: EnvelopeInfo): Promise
       text: parsed.text || null,
       headers: flattenHeaders(parsed.headers as Map<string, unknown>),
       attachments: parsed.attachments.map(
-        (a: { filename?: string | false; contentType?: string; size: number }): AttachmentMeta => ({
+        (a): AttachmentMeta => ({
           filename: a.filename || null,
           contentType: a.contentType ?? null,
           sizeBytes: a.size,
