@@ -12,6 +12,20 @@ function notFound(res: ServerResponse): void {
   sendJson(res, 404, { error: 'Not found' });
 }
 
+/** Parses `?limit=`, defaulting to 50 and clamping to [1, 200]. Missing or non-finite falls back to the default. */
+function parseLimit(raw: string | null): number {
+  if (raw === null) return 50;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(1, Math.min(n, 200)) : 50;
+}
+
+/** Parses `?offset=`, defaulting to 0 and flooring at 0. Missing or non-finite falls back to the default. */
+function parseOffset(raw: string | null): number {
+  if (raw === null) return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
@@ -83,8 +97,8 @@ export function handleApi(
       if (method === 'GET' && segments[0] === 'inboxes' && segments[2] === 'messages' && segments.length === 3) {
         const inboxId = Number(segments[1]);
         if (!store.getInbox(inboxId)) return notFound(res);
-        const limit = Math.min(Number(url.searchParams.get('limit') ?? 50) || 50, 200);
-        const offset = Number(url.searchParams.get('offset') ?? 0) || 0;
+        const limit = parseLimit(url.searchParams.get('limit'));
+        const offset = parseOffset(url.searchParams.get('offset'));
         const q = url.searchParams.get('q') ?? undefined;
         return sendJson(res, 200, store.listMessages(inboxId, { q, limit, offset }));
       }

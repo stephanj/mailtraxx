@@ -96,6 +96,34 @@ test('GET /api/inboxes/:id/messages supports search and paging', async () => {
   await h.close();
 });
 
+test('GET /api/inboxes/:id/messages clamps and validates limit/offset', async () => {
+  const h = await harness();
+  h.store.saveMessage(msg({ subject: 'One', receivedAt: '2026-08-12T09:00:00.000Z' }));
+  h.store.saveMessage(msg({ subject: 'Two', receivedAt: '2026-08-12T10:00:00.000Z' }));
+  h.store.saveMessage(msg({ subject: 'Three', receivedAt: '2026-08-12T11:00:00.000Z' }));
+  const id = h.store.listInboxes()[0].id;
+
+  // A negative limit must not reach SQLite unclamped: `LIMIT -1` there means "no limit",
+  // which would return every row instead of at most 1.
+  const negLimit = await (await fetch(`${h.base}/api/inboxes/${id}/messages?limit=-1`)).json();
+  assert.equal(negLimit.length, 1);
+
+  // A negative offset must not error or leak rows; it floors at 0.
+  const negOffset = await (await fetch(`${h.base}/api/inboxes/${id}/messages?offset=-5`)).json();
+  assert.equal(negOffset.length, 3);
+
+  // A non-numeric limit falls back to the default (50), not NaN/garbage.
+  const badLimit = await (await fetch(`${h.base}/api/inboxes/${id}/messages?limit=abc`)).json();
+  assert.equal(badLimit.length, 3);
+
+  // An explicit limit=0 is a real value, not "unset" — it clamps to the floor of 1
+  // rather than falling through to the 50 default.
+  const zeroLimit = await (await fetch(`${h.base}/api/inboxes/${id}/messages?limit=0`)).json();
+  assert.equal(zeroLimit.length, 1);
+
+  await h.close();
+});
+
 test('GET /api/messages/:id returns the full message, and 404s when missing', async () => {
   const h = await harness();
   const saved = h.store.saveMessage(msg());
