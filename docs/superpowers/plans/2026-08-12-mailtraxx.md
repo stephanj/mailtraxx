@@ -14,6 +14,7 @@
 
 - **Node 22+ required.** Verified on v22.22.3. The plan depends on three Node 22 features: native TypeScript type stripping (tests run `.ts` directly, no build step), `node:sqlite`, and `node:test`.
 - **Angular 22 exactly** (`@angular/core` 22.1.1, CLI 22.1.3). Standalone components, zoneless change detection, signals, `httpResource()`, built-in control flow (`@if`/`@for`/`@switch`), `input()`/`output()`/`inject()`. No NgModules, no `*ngIf`, no constructor injection, no Zone.js.
+- **Vitest is the UI test runner** — the default for new Angular 22 projects (`ng test --runner` defaults to `vitest`; Karma is opt-in via `--test-runner=karma`). So UI specs use `vi.spyOn(...).mockReturnValue(...)`, not Jasmine's `spyOn(...).and.returnValue(...)`, and `ng test` takes no `--browsers` flag.
 - **Type-stripping compatible TypeScript only.** No `enum`, no `namespace`, no constructor parameter properties, no non-`type` re-exports of types. `tsconfig` sets `"erasableSyntaxOnly": true` so violations fail loudly. Angular's own code is compiled by the Angular CLI and is exempt.
 - **ESM everywhere.** `"type": "module"`. Relative imports carry explicit extensions, and TypeScript sources import each other as `./foo.ts`.
 - **Both listeners bind to `127.0.0.1`** — never `0.0.0.0`.
@@ -1978,8 +1979,21 @@ test('still routes /api requests to the API', async () => {
 
 test('refuses to serve files outside the UI root', async () => {
   const h = await harness();
-  const res = await fetch(`${h.base}/../../../etc/passwd`, { redirect: 'manual' });
-  assert.notEqual(res.status, 200);
+  // fetch() would normalize the `..` segments away client-side, so the guard would
+  // never see them. node:http sends the path verbatim, which is what an attacker does.
+  const { request } = await import('node:http');
+  const status = await new Promise<number>((resolve, reject) => {
+    const req = request(
+      { host: '127.0.0.1', port: Number(new URL(h.base).port), path: '/../../../etc/passwd', method: 'GET' },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+  assert.equal(status, 403);
   await h.close();
 });
 
@@ -2246,7 +2260,7 @@ Expected: `packages/ui` exists with `@angular/core` 22.x in its `package.json`.
 
 - [ ] **Step 2: Verify the scaffold builds and its tests run**
 
-Run: `npm run build --workspace packages/ui && npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless`
+Run: `npm run build --workspace packages/ui && npm test --workspace packages/ui -- --watch=false`
 Expected: build succeeds into `packages/ui/dist/ui/browser`; the default spec passes.
 
 - [ ] **Step 3: Add the dev-server proxy**
@@ -2360,10 +2374,19 @@ class FakeEventSource {
   onmessage: ((e: MessageEvent) => void) | null = null;
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
+  readonly listeners: Record<string, (e: MessageEvent) => void> = {};
+  readonly url: string;
   closed = false;
-  constructor(public url: string) {
+
+  constructor(url: string) {
+    this.url = url;
     FakeEventSource.last = this;
   }
+
+  addEventListener(type: string, fn: (e: MessageEvent) => void) {
+    this.listeners[type] = fn;
+  }
+
   close() {
     this.closed = true;
   }
@@ -2387,14 +2410,21 @@ describe('LiveFeed', () => {
     expect(FakeEventSource.last?.url).toBe('/api/events');
   });
 
-  it('exposes the most recent event as a signal', () => {
+  it('exposes named events as a signal — the path the server actually uses', () => {
     const feed = TestBed.inject(LiveFeed);
     expect(feed.lastEvent()).toBeNull();
 
+    const event = { type: 'message.created', message: { id: 3, inboxId: 1 } };
+    FakeEventSource.last!.listeners['message.created']({ data: JSON.stringify(event) } as MessageEvent);
+
+    expect(feed.lastEvent()).toEqual(event);
+  });
+
+  it('also accepts unnamed frames via onmessage', () => {
+    const feed = TestBed.inject(LiveFeed);
     FakeEventSource.last!.onmessage!({
       data: JSON.stringify({ type: 'messages.cleared', inboxId: 7 }),
     } as MessageEvent);
-
     expect(feed.lastEvent()).toEqual({ type: 'messages.cleared', inboxId: 7 });
   });
 
@@ -2417,7 +2447,7 @@ describe('LiveFeed', () => {
 
 - [ ] **Step 7: Run the test to verify it fails**
 
-Run: `npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless`
+Run: `npm test --workspace packages/ui -- --watch=false`
 Expected: FAIL — cannot resolve `./live-feed`.
 
 - [ ] **Step 8: Write the live feed service**
@@ -2472,7 +2502,7 @@ In `packages/ui/src/app/app.config.ts`, add `provideHttpClient()` from `@angular
 
 - [ ] **Step 10: Run the tests to verify they pass**
 
-Run: `npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless`
+Run: `npm test --workspace packages/ui -- --watch=false`
 Expected: PASS — 4 LiveFeed specs.
 
 - [ ] **Step 11: Commit**
@@ -2599,7 +2629,7 @@ describe('MessageList', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless`
+Run: `npm test --workspace packages/ui -- --watch=false`
 Expected: FAIL — cannot resolve `./message-list`.
 
 - [ ] **Step 3: Write the message list component**
@@ -2704,7 +2734,7 @@ export class MessageList {
 
 - [ ] **Step 4: Run the message list tests to verify they pass**
 
-Run: `npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless`
+Run: `npm test --workspace packages/ui -- --watch=false`
 Expected: PASS — 6 MessageList specs plus the 4 from Task 9.
 
 - [ ] **Step 5: Write the inbox list component**
@@ -2889,7 +2919,7 @@ body {
 
 - [ ] **Step 8: Run the tests and build**
 
-Run: `npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless && npm run build --workspace packages/ui`
+Run: `npm test --workspace packages/ui -- --watch=false && npm run build --workspace packages/ui`
 Expected: PASS, and a successful build.
 
 - [ ] **Step 9: Commit**
@@ -2967,6 +2997,7 @@ describe('HtmlPreview', () => {
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MessageViewer } from './message-viewer';
 import type { Message } from './models';
 
@@ -3052,7 +3083,7 @@ describe('MessageViewer', () => {
 
   it('emits after deleting', async () => {
     await load();
-    spyOn(window, 'confirm').and.returnValue(true);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     let emitted: number | undefined;
     fixture.componentInstance.deleted.subscribe((id) => (emitted = id));
 
@@ -3066,7 +3097,7 @@ describe('MessageViewer', () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless`
+Run: `npm test --workspace packages/ui -- --watch=false`
 Expected: FAIL — cannot resolve `./html-preview` and `./message-viewer`.
 
 - [ ] **Step 3: Write the HTML preview**
@@ -3267,7 +3298,7 @@ In `packages/ui/src/app/app.ts`, add `MessageViewer` to `imports` and replace th
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
-Run: `npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless`
+Run: `npm test --workspace packages/ui -- --watch=false`
 Expected: PASS — 4 LiveFeed + 6 MessageList + 3 HtmlPreview + 5 MessageViewer specs.
 
 - [ ] **Step 7: Commit**
@@ -3302,7 +3333,7 @@ Replace the `scripts` block in the root `package.json`:
     "start": "npm run build && node --no-warnings=ExperimentalWarning packages/server/src/main.ts",
     "dev:server": "node --no-warnings=ExperimentalWarning --watch packages/server/src/main.ts",
     "dev:ui": "npm start --workspace packages/ui",
-    "test": "npm run test --workspace packages/server && npm test --workspace packages/ui -- --watch=false --browsers=ChromeHeadless"
+    "test": "npm run test --workspace packages/server && npm test --workspace packages/ui -- --watch=false"
   }
 ```
 
@@ -3352,7 +3383,9 @@ Verify the override took effect: start the app and confirm the log or `/actuator
 
 - [ ] **Step 6: Run the acceptance test**
 
-Start callforpapers in its dev profile with mail sending enabled (`CFP_MAIL_ENABLED=true`, and `spring.mail.enabled: true` — it defaults to `false` in `application.yml`). Trigger an email the app really sends, such as a speaker notification.
+Start callforpapers in its dev profile and trigger an email the app really sends, such as a speaker notification.
+
+Sending needs no extra flag: `application.yml:351` sets `cfp.mail.enabled: ${CFP_MAIL_ENABLED:true}` (read by `SendMailService`), so it is on unless `CFP_MAIL_ENABLED=false` is in the local `.env`. Check that first if nothing arrives. The `management.health.mail.enabled: false` at `application.yml:98` is the Actuator health indicator, not a send toggle — leave it as is.
 
 Expected: the message appears in the `240f00ce858a00` inbox with the correct subject, recipient, and rendered HTML. If Jakarta Mail reports an authentication failure, confirm `allowInsecureAuth: true` and `disabledCommands: ['STARTTLS']` are both set in `packages/server/src/smtp.ts` — that pair is what makes opportunistic STARTTLS fall back to plaintext AUTH.
 
@@ -3447,4 +3480,5 @@ Checked against `docs/superpowers/specs/2026-08-12-mailtraxx-design.md`:
 
 - Every spec section maps to a task: architecture units → Tasks 2–8; inbox model → Tasks 2 and 5; data model and retention → Tasks 2–3; HTTP API (all 8 routes) → Task 7; SSE → Tasks 6–7; UI components → Tasks 10–11; HTML preview safety → Task 11; all six error-handling rows → Tasks 5, 7, and 8; the test pyramid → distributed across all tasks; callforpapers integration → Task 12.
 - Placeholder scan: clean. Two spots that originally showed wrong code followed by a correction step — a bad CSS token value and SSE wiring that only handled unnamed frames — now show the correct code directly.
+- Four defects found and fixed on review: the `LiveFeed` spec's fake `EventSource` lacked the `addEventListener` the implementation calls; the path-traversal test used `fetch`, which normalizes `..` away before the request leaves the client, so it could never reach the guard; the UI test commands and spy idiom assumed Karma/Jasmine when Angular 22 defaults to Vitest; and Task 12 claimed mail sending was off in callforpapers when `cfp.mail.enabled` defaults to `true`.
 - Type names are consistent across tasks: `SqliteStore`, `SaveResult`, `ParsedMessage`, `MessageSummary`, `Message`, `Inbox`, `AttachmentMeta`, `MailtraxxEvent`, `SmtpHandle`, `WebHandle`. The UI's `models.ts` mirrors the server's `types.ts` field for field.

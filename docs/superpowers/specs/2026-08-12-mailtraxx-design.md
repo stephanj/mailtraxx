@@ -298,8 +298,9 @@ server advertises it. mailtraxx does not, so the client falls back to plaintext 
 server must set `allowInsecureAuth: true` to accept AUTH on an unencrypted connection. Verify this
 against a real send from callforpapers, not just a hand-rolled SMTP client.
 
-Sending must also be switched on — callforpapers ships with `spring.mail.enabled: false` in
-`application.yml` and a `CFP_MAIL_ENABLED` env flag.
+Sending is already on: `application.yml:351` sets `cfp.mail.enabled: ${CFP_MAIL_ENABLED:true}`, read
+by `SendMailService`. The `management.health.mail.enabled: false` further up that file is the
+Actuator *health indicator*, not a send toggle — leave it alone.
 
 ## CLI
 
