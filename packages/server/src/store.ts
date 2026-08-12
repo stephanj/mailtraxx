@@ -233,7 +233,9 @@ export class SqliteStore {
   }
 
   getMessage(id: number): Message | undefined {
-    const row = this.#db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as unknown as MessageRow | undefined;
+    const row = this.#db
+      .prepare('SELECT *, (html IS NOT NULL) AS has_html FROM messages WHERE id = ?')
+      .get(id) as unknown as MessageRow | undefined;
     if (!row) return undefined;
 
     const attachments = this.#db

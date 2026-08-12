@@ -48,6 +48,7 @@ test('getMessage returns the full body, headers, and attachment metadata', () =>
   assert.equal(full.html, '<h1>Accepted</h1>');
   assert.equal(full.text, 'Accepted');
   assert.equal(full.raw, 'Subject: Your talk was accepted\r\n\r\nAccepted');
+  assert.equal(full.hasHtml, true);
   assert.deepEqual(full.headers, { subject: 'Your talk was accepted' });
   assert.deepEqual(full.attachments, [
     { filename: 'slides.pdf', contentType: 'application/pdf', sizeBytes: 1234 },
