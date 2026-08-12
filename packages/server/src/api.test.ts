@@ -108,11 +108,15 @@ test('GET /api/inboxes/:id/messages clamps and validates limit/offset', async ()
   const negLimit = await (await fetch(`${h.base}/api/inboxes/${id}/messages?limit=-1`)).json();
   assert.equal(negLimit.length, 1);
 
-  // A negative offset must not error or leak rows; it floors at 0.
+  // A negative offset must not error or leak rows; it floors at 0. (SQLite already treats a
+  // negative OFFSET as 0 on its own, so this documents the intended behavior without being
+  // able to catch a regression in the JS-side floor by itself.)
   const negOffset = await (await fetch(`${h.base}/api/inboxes/${id}/messages?offset=-5`)).json();
   assert.equal(negOffset.length, 3);
 
-  // A non-numeric limit falls back to the default (50), not NaN/garbage.
+  // A non-numeric limit falls back to the default (50), not NaN/garbage. (`Number('abc') || 50`
+  // was already 50 pre-fix, so this documents intended behavior without discriminating a
+  // regression in the `Number.isFinite` check by itself.)
   const badLimit = await (await fetch(`${h.base}/api/inboxes/${id}/messages?limit=abc`)).json();
   assert.equal(badLimit.length, 3);
 
@@ -120,6 +124,19 @@ test('GET /api/inboxes/:id/messages clamps and validates limit/offset', async ()
   // rather than falling through to the 50 default.
   const zeroLimit = await (await fetch(`${h.base}/api/inboxes/${id}/messages?limit=0`)).json();
   assert.equal(zeroLimit.length, 1);
+
+  // A fractional limit must be truncated before it reaches SQLite: `LIMIT 2.7` throws
+  // "datatype mismatch" there, which would surface as a 500, not a clamped result.
+  const fracLimitRes = await fetch(`${h.base}/api/inboxes/${id}/messages?limit=2.7`);
+  assert.equal(fracLimitRes.status, 200);
+  assert.equal((await fracLimitRes.json()).length, 2);
+
+  // A huge offset must be bounded before it reaches SQLite: `OFFSET 1e21` throws
+  // "datatype mismatch" there (out of range for a 64-bit integer), which would surface
+  // as a 500 instead of an empty (but valid) page past the end of the results.
+  const hugeOffsetRes = await fetch(`${h.base}/api/inboxes/${id}/messages?offset=1e21`);
+  assert.equal(hugeOffsetRes.status, 200);
+  assert.deepEqual(await hugeOffsetRes.json(), []);
 
   await h.close();
 });

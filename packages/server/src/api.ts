@@ -12,18 +12,29 @@ function notFound(res: ServerResponse): void {
   sendJson(res, 404, { error: 'Not found' });
 }
 
-/** Parses `?limit=`, defaulting to 50 and clamping to [1, 200]. Missing or non-finite falls back to the default. */
+/**
+ * Parses `?limit=`, defaulting to 50 and clamping to [1, 200]. Missing or non-finite falls
+ * back to the default. Truncated to an integer — SQLite's `LIMIT` rejects fractional values
+ * with a "datatype mismatch" error, so a value like `2.7` must not reach the driver as-is.
+ */
 function parseLimit(raw: string | null): number {
   if (raw === null) return 50;
   const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(1, Math.min(n, 200)) : 50;
+  if (!Number.isFinite(n)) return 50;
+  return Math.trunc(Math.max(1, Math.min(n, 200)));
 }
 
-/** Parses `?offset=`, defaulting to 0 and flooring at 0. Missing or non-finite falls back to the default. */
+/**
+ * Parses `?offset=`, defaulting to 0 and clamping to [0, Number.MAX_SAFE_INTEGER]. Missing or
+ * non-finite falls back to the default. Truncated to an integer for the same reason as
+ * `parseLimit`, and bounded above so an overflowed value (e.g. `1e21`) can't reach SQLite,
+ * which also rejects a fractional or out-of-range `OFFSET` with "datatype mismatch".
+ */
 function parseOffset(raw: string | null): number {
   if (raw === null) return 0;
   const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(0, n) : 0;
+  if (!Number.isFinite(n)) return 0;
+  return Math.trunc(Math.max(0, Math.min(n, Number.MAX_SAFE_INTEGER)));
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
