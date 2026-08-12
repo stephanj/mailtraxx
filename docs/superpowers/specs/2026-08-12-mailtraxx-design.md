@@ -266,18 +266,32 @@ UI with correct subject, recipients, and HTML rendering.
 
 ## Integrating callforpapers
 
-One line in `/Users/stephan/projects/callforpapers/src/main/resources/application-dev.yml`:
+callforpapers points its dev profile at mailtrap.io in
+`src/main/resources/application-dev.yml`:
 
 ```yaml
   mail:
-    host: localhost          # was smtp.mailtrap.io
-    username: 240f00ce858a00 # unchanged — becomes the inbox name
-    password: b6cba990e80601 # unchanged — any value is accepted
-    port: 2525               # unchanged
+    host: smtp.mailtrap.io
+    username: 240f00ce858a00
+    password: b6cba990e80601
+    port: 2525
     properties:
       '[mail.smtp.auth]': true
       '[mail.smtp.starttls.enable]': true
 ```
+
+Only the host has to change, and it should change *locally*, not in tracked config: that file is
+shared, so editing it would redirect every developer's dev mail to a mailtraxx they aren't running.
+callforpapers loads an untracked `.env` through mise (`mise.toml`: `_.file = [".env"]`;
+`.gitignore:12` ignores `/.env`), and Spring Boot's relaxed binding maps `SPRING_MAIL_HOST` onto
+`spring.mail.host`. So the whole integration is one line in that local file:
+
+```bash
+SPRING_MAIL_HOST=localhost
+```
+
+Port, username, password, and the `mail.smtp.*` properties stay untouched. The username becomes the
+inbox name; the password is accepted whatever it is.
 
 `starttls.enable=true` is *opportunistic* in Jakarta Mail: the client uses STARTTLS only if the
 server advertises it. mailtraxx does not, so the client falls back to plaintext — which means the
