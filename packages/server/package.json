@@ -1,0 +1,19 @@
+{
+  "name": "mailtraxx",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "mailtraxx": "./bin/mailtraxx.js" },
+  "scripts": {
+    "test": "node --test 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "mailparser": "^3.9.15",
+    "smtp-server": "^3.19.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "nodemailer": "^7.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": { "node": ">=22.18.0" }
+}

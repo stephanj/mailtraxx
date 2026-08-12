@@ -1,0 +1,10 @@
+{
+  "name": "mailtraxx-root",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/server", "packages/ui"],
+  "scripts": {
+    "test": "npm run test --workspace packages/server",
+    "start": "node packages/server/src/main.ts"
+  }
+}
