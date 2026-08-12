@@ -96,7 +96,14 @@ export function handleApi(
 
       // PATCH /api/inboxes/:id
       if (method === 'PATCH' && segments[0] === 'inboxes' && segments.length === 2) {
-        const body = (await readJsonBody(req)) as { name?: unknown };
+        let body: { name?: unknown };
+        try {
+          body = (await readJsonBody(req)) as { name?: unknown };
+        } catch {
+          // Don't leak the JSON parser's internal message (e.g. "Unexpected
+          // token X in JSON at position N") to the client.
+          return sendJson(res, 400, { error: 'Malformed JSON body' });
+        }
         if (typeof body.name !== 'string' || body.name.trim() === '') {
           return sendJson(res, 400, { error: 'name must be a non-empty string' });
         }

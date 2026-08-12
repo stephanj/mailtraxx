@@ -24,8 +24,11 @@ export async function runMailtraxx(
   const bus = new EventBus();
 
   const smtp = await startSmtpServer(config, store, (result) => {
-    bus.emit({ type: 'message.created', message: result.message });
+    // inbox.created must reach clients before message.created references it,
+    // otherwise a client can briefly see a message pointing at an inbox it
+    // doesn't know about yet.
     if (result.inboxCreated) bus.emit({ type: 'inbox.created', inbox: result.inbox });
+    bus.emit({ type: 'message.created', message: result.message });
     logCaptured(result.message.subject, result.message.fromDisplay, result.message.toAddrs, result.inbox.name);
   });
 

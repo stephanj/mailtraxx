@@ -124,10 +124,10 @@ export class SqliteStore {
   readonly #retain: number;
 
   constructor(dbPath: string, retain: number) {
-    if (dbPath !== ':memory:') {
-      mkdirSync(dirname(dbPath), { recursive: true });
-    }
     try {
+      if (dbPath !== ':memory:') {
+        mkdirSync(dirname(dbPath), { recursive: true });
+      }
       this.#db = new DatabaseSync(dbPath);
       this.#db.exec(SCHEMA);
     } catch (cause) {

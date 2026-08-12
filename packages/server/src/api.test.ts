@@ -79,6 +79,21 @@ test('PATCH /api/inboxes/:id renames', async () => {
   await h.close();
 });
 
+test('PATCH /api/inboxes/:id with a malformed JSON body returns 400, not a leaked parser error', async () => {
+  const h = await harness();
+  const { inbox } = h.store.ensureInbox('cfp');
+  const res = await fetch(`${h.base}/api/inboxes/${inbox.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: '{not valid json',
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(typeof body.error, 'string');
+  assert.doesNotMatch(body.error, /Unexpected token|JSON\.parse|position \d/);
+  await h.close();
+});
+
 test('GET /api/inboxes/:id/messages supports search and paging', async () => {
   const h = await harness();
   h.store.saveMessage(msg({ subject: 'Talk accepted', receivedAt: '2026-08-12T10:00:00.000Z' }));
