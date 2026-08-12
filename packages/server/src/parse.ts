@@ -51,6 +51,12 @@ export async function parseMessage(raw: Buffer, envelope: EnvelopeInfo): Promise
     subject: null,
     html: null,
     text: null,
+    // Lossy for a message that uses raw 8-bit bytes outside valid UTF-8 (e.g. an
+    // iso-8859-1 body sent without an ASCII-safe transfer encoding): each such byte
+    // becomes U+FFFD here, so GET /api/messages/:id/raw will not be byte-exact for
+    // it. Accepted because both senders in scope (Jakarta Mail, nodemailer) encode
+    // non-ASCII content as quoted-printable or base64, which round-trip fine as
+    // UTF-8 text. See README.md "Known limitations".
     raw: raw.toString('utf8'),
     headers: {},
     sizeBytes: raw.length,

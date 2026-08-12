@@ -52,6 +52,16 @@ spring:
 No attachment downloads, no spam scoring, no forwarding to real recipients, and no remote access —
 both listeners bind to `127.0.0.1` only.
 
+## Known limitations
+
+The raw `.eml` download (`GET /api/messages/:id/raw`) is byte-exact only for messages whose
+non-ASCII content uses an ASCII-safe transfer encoding — quoted-printable, base64, or plain 7bit.
+A message that instead uses raw 8-bit bytes outside valid UTF-8 (e.g. an `iso-8859-1` body sent
+without such an encoding) will have those bytes replaced with the Unicode replacement character
+(`U+FFFD`) when stored, so its downloaded `.eml` will not round-trip byte-for-byte. Both senders
+in scope for this project (Jakarta Mail, nodemailer) encode non-ASCII as quoted-printable or
+base64, so this does not affect them in practice.
+
 ## Development
 
 ```bash
