@@ -12,7 +12,7 @@
     "smtp-server": "^3.19.3"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^26.2.0",
     "nodemailer": "^7.0.0",
     "typescript": "^5.7.0"
   },
