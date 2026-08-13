@@ -72,3 +72,7 @@ npm test          # server and UI tests
 npm run dev:server # server with --watch
 npm run dev:ui     # Angular dev server, proxying /api to port 1080
 ```
+
+## License
+
+[MIT](LICENSE) © 2026 Stephan Janssen
