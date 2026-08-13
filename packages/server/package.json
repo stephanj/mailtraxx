@@ -14,7 +14,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "nodemailer": "^7.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^7.0.2"
   },
   "engines": { "node": ">=22.18.0" }
 }
