@@ -1,0 +1,32 @@
+version: 2
+
+updates:
+  # npm workspaces: each package.json needs its own directory entry — the root
+  # holds only workspace wiring, so nothing would be found by scanning "/" alone.
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /packages/server
+      - /packages/ui
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Brussels
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # Angular ships ~10 packages that must move together — one PR per package
+      # would produce a set of individually unmergeable version mismatches.
+      angular:
+        patterns:
+          - "@angular/*"
+      # Everything else, batched, so routine bumps cost one review instead of ten.
+      # Majors are deliberately excluded and still arrive as their own PR: a major
+      # is where the breaking change lives and deserves to be reviewed alone.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
