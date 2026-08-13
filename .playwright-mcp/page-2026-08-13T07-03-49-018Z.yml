@@ -1,0 +1,15 @@
+- generic [active] [ref=e1]:
+  - 'heading "A. current: sandbox=\"\" (as shipped)" [level=3] [ref=e2]'
+  - iframe [ref=e3]:
+    - generic [ref=f1e1]:
+      - link "target=_blank link" [ref=f1e2] [cursor=pointer]:
+        - /url: https://example.com/
+      - link "plain link (no target)" [ref=f1e3] [cursor=pointer]:
+        - /url: https://example.com/
+  - 'heading "B. candidate: sandbox=\"allow-popups allow-popups-to-escape-sandbox\"" [level=3] [ref=e4]'
+  - iframe [ref=e5]:
+    - generic [ref=f2e1]:
+      - link "target=_blank link" [ref=f2e2] [cursor=pointer]:
+        - /url: https://example.com/
+      - link "plain link (no target)" [ref=f2e3] [cursor=pointer]:
+        - /url: https://example.com/

@@ -866,7 +866,11 @@ Insert these methods into the `SqliteStore` class, before `close()`:
   }
 
   getMessage(id: number): Message | undefined {
-    const row = this.#db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as unknown as MessageRow | undefined;
+    // The computed has_html must be selected explicitly — SELECT * alone leaves it
+    // undefined, and toSummary would then report hasHtml: false for every message.
+    const row = this.#db
+      .prepare('SELECT *, (html IS NOT NULL) AS has_html FROM messages WHERE id = ?')
+      .get(id) as unknown as MessageRow | undefined;
     if (!row) return undefined;
 
     const attachments = this.#db

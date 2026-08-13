@@ -1,0 +1,12 @@
+- generic [ref=f3e3]:
+  - generic [ref=f3e4]:
+    - banner [ref=f3e5]:
+      - heading "mailtraxx" [level=1] [ref=f3e6]
+      - generic "Live" [ref=f3e7]
+    - list [ref=f3e8]:
+      - listitem [ref=f3e9] [cursor=pointer]:
+        - generic "Double-click to rename" [ref=f3e10]: 240f00ce858a00
+        - generic [ref=f3e11]: "4"
+        - button "Clear" [ref=f3e12]
+  - generic [ref=f3e13]: Select an inbox
+  - generic [ref=f3e14]: Select a message

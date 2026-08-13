@@ -155,12 +155,16 @@ CREATE TABLE attachments (
 );
 ```
 
-`raw` is stored unconditionally, even when parsing fails — the raw source is the source of truth
-and the fallback view.
+`raw` is stored unconditionally, even when parsing fails — it is the fallback view when structured
+parsing doesn't produce something useful. It is decoded and stored as a UTF-8 string, which is
+byte-exact only for messages whose non-ASCII content uses an ASCII-safe transfer encoding
+(quoted-printable, base64, 7bit) — true of both senders in scope (Jakarta Mail, nodemailer). A
+message using raw 8-bit bytes outside valid UTF-8 will have those bytes replaced with U+FFFD, so
+`raw` is not a byte-exact source of truth in that case. See `README.md` "Known limitations".
 
 Attachment **content** is not stored in v1. The metadata row records that an attachment existed
-so the UI can show it; downloading it is not offered. The full attachment is still recoverable
-from the `raw` column if ever needed.
+so the UI can show it; downloading it is not offered. The attachment may be recoverable from the
+`raw` column, subject to the same UTF-8 fidelity caveat above — it is not guaranteed byte-exact.
 
 **Retention:** on insert, keep the newest 500 messages per inbox and delete older ones
 (configurable via `--retain`). This bounds the database without a background job.

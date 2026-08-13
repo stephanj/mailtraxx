@@ -1,0 +1,13 @@
+{
+  "name": "mailtraxx-root",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/server", "packages/ui"],
+  "scripts": {
+    "build": "npm run build --workspace packages/ui",
+    "start": "npm run build && node --no-warnings=ExperimentalWarning packages/server/src/main.ts",
+    "dev:server": "node --no-warnings=ExperimentalWarning --watch packages/server/src/main.ts",
+    "dev:ui": "npm start --workspace packages/ui",
+    "test": "npm run test --workspace packages/server && npm test --workspace packages/ui -- --watch=false"
+  }
+}
