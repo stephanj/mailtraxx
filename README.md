@@ -23,6 +23,9 @@ mailtraxx  SMTP 127.0.0.1:2525   UI http://localhost:1080
 Point any app's SMTP settings at `localhost:2525`. Any username and password are accepted — the
 **username picks the inbox**, created on first use. Unauthenticated mail lands in `default`.
 
+<img width="1679" height="682" alt="Screenshot 2026-08-13 at 09 17 57" src="https://github.com/user-attachments/assets/bdddd89c-f0ef-44f5-9b57-bf54f12e5184" />
+
+
 ## Options
 
 | Flag | Default | Meaning |
